@@ -7,8 +7,8 @@ no_of_drops <- 1029
   y_data_reduction <- TRUE
 
 # Circle fit error (normalised RMSE) threshold for inclusion of droplet in
-# final fit to find contact angle:
-  RMSE_threshold <- 0.04
+# final fit to find contact angle (relative error... e.g. 0.1 = 10%):
+  RMSE_threshold <- 0.5
 
 
 #######################
