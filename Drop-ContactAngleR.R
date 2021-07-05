@@ -8,7 +8,7 @@ no_of_drops <- 1029
 
 # Circle fit error (normalised RMSE) threshold for inclusion of droplet in
 # final fit to find contact angle (relative error... e.g. 0.1 = 10%):
-  RMSE_threshold <- 0.5
+  RMSE_threshold <- 0.3
 
 
 #######################
@@ -144,6 +144,7 @@ ggplot(NULL, aes(x, y)) +
   geom_point(data = xy_trans) +
   geom_path(data = cmodel_df) +
   geom_path(data = slide_surface_arc)
+
   
 
 #####################
@@ -172,101 +173,124 @@ results <- results[rows_to_keep,]
 # (vertical asymp = 0; horizontal asymp = contact angle)
 
 # Manual approximation...
-# f <- function(x) 100*(1/(sinh(x^0.7))) + 31
+# f <- function(x) 80*(1/(sinh(x^0.6))) + 35
+# (i.e. a=100, b=0.7, c=40)
 
+# 'c' is the horizontal asymptote, and represents the theoretical contact angle
+# of an infinitely large droplet.
 
-######  For fitting 3 coefficients: ###### 
+# For fitting all 3 coefficients: # 
 
-f <- contact_angles ~ a*(1/(sinh(droplet_widths^b))) + c
+model_hyprblc <- nls(
+              formula = contact_angles ~ a*(1/(sinh(droplet_widths^b))) + c, 
+              data = results, 
+              start = list(a=80, b=0.6, c=35),
+              control = nls.control(maxiter = 200, minFactor = 1/4096))
+summary(model_hyprblc)
 
-model <- nls(formula = f, 
-             data = results, 
-             start = list(a=100, b=0.7, c=31))
-summary(model)
+a <- coef(model_hyprblc)[1]
+b <- coef(model_hyprblc)[2]
+c <- coef(model_hyprblc)[3]
 
-a<-coef(model)[1]
-b<-coef(model)[2]
-c<-coef(model)[3]
+func_hyprblc <- function(droplet_widths){ a*(1/(sinh(droplet_widths^b))) + c}
 
-func <- function(droplet_widths){ a*(1/(sinh(droplet_widths^b))) + c}
-
-plt <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
+plt1 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
-  stat_function(fun = func)
-  # (+) coord_cartesian(ylim = c(25,100))
+  stat_function(fun = func_hyprblc) +
+  ylim(0,180)
 
-plt
-
+plt1
 # plotly::ggplotly(plt)
 
-contact_angle_fit <- summary(model)$parameters[3,1]
-contact_angle_fit_stderr <- summary(model)$parameters[3,2]
+contact_angle_hyprblc <- summary(model_hyprblc)$parameters[3,1]
+contact_angle_hyprblc_stderr <- summary(model_hyprblc)$parameters[3,2]
 
 
-# 
-# ###### For fitting only 2 coefficients: ######
-# 
-# f <- contact_angles ~ 100*(1/(sinh(droplet_widths^b))) + c
-# 
-# model <- nls(formula = f,
-#              data = results,
-#              start = list(b=0.7, c=31))
-# 
-# summary(model)
-# 
-# b<-coef(model)[1]
-# c<-coef(model)[2]
-# 
-# func <- function(droplet_widths){ 100*(1/(sinh(droplet_widths^b))) + c}
-# 
-# plt <- ggplot(data = results, mapping = aes(droplet_widths, contact_angles)) +
-#   geom_point() +
-#   # geom_smooth() +
-#   stat_function(fun = func)
-# # (+) coord_cartesian(ylim = c(25,100))
-# 
-# plt
-# 
-# # plotly::ggplotly(plt)
-# 
-# contact_angle_fit <- summary(model)$parameters[2,1]
-# contact_angle_fit_stderr <- summary(model)$parameters[2,2]
-# 
-# 
-# 
-# ###### For fitting only contact angle (1 coefficient): ######
-# 
-# a <- 100
-# b <- 1.0
-# 
-# f <- contact_angles ~ a*(1/(sinh(droplet_widths^b))) + c
-# 
-# model <- nls(formula = f,
-#              data = results,
-#              start = list(c=31))
-# 
-# summary(model)
-# 
-# c<-coef(model)[1]
-# 
-# func <- function(droplet_widths){ a*(1/(sinh(droplet_widths^b))) + c}
-# 
-# plt <- ggplot(data = results, mapping = aes(droplet_widths, contact_angles)) +
-#   geom_point(mapping = aes(colour=RMSE_norm)) +
-#   # geom_smooth() +
-#   stat_function(fun = func) +
-#   ylim(0, 180)
-# # (+) coord_cartesian(ylim = c(25,100))
-# 
-# plt
-# 
-# # plotly::ggplotly(plt)
-# 
-# contact_angle_fit <- summary(model)$parameters[1,1]
-# contact_angle_fit_stderr <- summary(model)$parameters[1,2]
+###### For fitting horizontal line ######
+# (used when using a very strict RMSE_threshold... i.e. only large, well-fitted
+# droplets should be included in the data)
+
+model_linear <- nls(
+              formula = contact_angles ~ y_int,
+              data = results,
+              start = list(y_int=35))
+summary(model_linear)
+
+y_int <- coef(model_linear)[1]
+
+func_linear <- function(droplet_widths){y_int}
+
+plt2 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
+  geom_point(mapping = aes(colour=RMSE_norm)) +
+  # geom_smooth() +
+  stat_function(fun = func_linear) +
+  ylim(0,180)
+
+plt2
+# plotly::ggplotly(plt)
+
+contact_angle_linear <- summary(model_linear)$parameters[1,1]
+contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 
 
-# ###### For fitting horizontal line ######
+###### For binning data before fitting hyperbolic function: ######
 
+# set up dividers for bins:
+breaks <- seq(0, 13, by = 0.5)
 
+# specify interval/bin labels:
+bin_num <- seq(0.5, 13, by = 0.5)
+tags <- as.character(bin_num)
+
+# assign values to bins:
+bin <- cut(results$droplet_widths, 
+           breaks=breaks, 
+           include.lowest=TRUE, 
+           right=FALSE, 
+           labels=tags)
+# inspect bins
+summary(bin)
+
+# Append bin column to results df:
+results$bin <- bin
+
+sorted_results <- results[order(results$bin),]
+
+bin_mean_contact_angle <- c()
+
+for (k in bin_num) {
+  results_bin_logic <- sorted_results$bin == k
+  results_single_bin <- na.omit(sorted_results[results_bin_logic,])
+  bin_mean_contact_angle <- c(bin_mean_contact_angle, mean(results_single_bin$contact_angles))
+}
+
+binned_data <- data.frame(bin_num, bin_mean_contact_angle)
+
+# Fit hyperbolic function: 
+
+model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a*(1/(sinh(bin_num^b))) + c, 
+             data = binned_data, 
+             start = list(a=80, b=0.6, c=35),
+             control = nls.control(maxiter = 200, minFactor = 1/4096))
+summary(model_hyprblc_bins)
+
+a<-coef(model_hyprblc_bins)[1]
+b<-coef(model_hyprblc_bins)[2]
+c<-coef(model_hyprblc_bins)[3]
+
+# Visualisation #
+
+func_hyprblc_bins <- function(bin_num){ a*(1/(sinh(bin_num^b))) + c}
+
+plt3 <- ggplot() +
+  geom_point(mapping=aes(x=droplet_widths, y=contact_angles, colour=RMSE_norm), data=results) +
+  geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
+  stat_function(fun=func_hyprblc_bins, colour="magenta", size=1) +
+  ylim(0,180)
+
+plt3
+# plotly::ggplotly(plt)
+
+contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
+contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
