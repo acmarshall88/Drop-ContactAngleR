@@ -1,4 +1,4 @@
-### USER INPUT: ###
+###### USER INPUT: ######
 directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_Confocal\\plateII_B11_60x_0p10_2048.nd2_analysis(1-1000_th15_f2_1.2)"
 no_of_drops <- 1029
 
@@ -12,6 +12,7 @@ no_of_drops <- 1029
 
 
 #######################
+# Create empty vectors for filled with 'for' loop:
 droplet_widths <- c()
 contact_angles <- c()
 radii <- c() 
@@ -19,10 +20,15 @@ radii <- c()
 # Create Progress Bar for 'for' loop (below):
 progress = txtProgressBar(min = 1, max = no_of_drops, initial = 1)
 
+# Remove previous file containing list of RMSEs (if exists):
+if (file.exists("circfit RMS errors.csv")==TRUE) {
+  unlink("circfit RMS errors.csv")
+}
+
 for (i in 1:no_of_drops) {
 
   # Write RMS errors of circlefit() to file (instead of printing to console):
-  sink(file = "circfit RMS errors.csv", append = FALSE)
+  sink(file = "circfit RMS errors.csv", append = TRUE)
   
   xy_data_file <- paste(i, "_XZ_SurfacePx.csv", sep = "")
   
@@ -168,6 +174,11 @@ results <- data.frame(radii, cfit_RMSEs, RMSE_norm, droplet_widths, contact_angl
 rows_to_keep <- RMSE_norm <= RMSE_threshold
 results <- results[rows_to_keep,]
 
+# Assign min and max values (for plots):
+min_contact_angle <-min(results$contact_angles, na.rm = TRUE)
+max_contact_angle <-max(results$contact_angles, na.rm = TRUE)
+min_droplet_width <-min(results$droplet_widths, na.rm = TRUE)
+max_droplet_width <-max(results$droplet_widths, na.rm = TRUE)
 
 ###### Fit hyperbolic function with 2 asymptotes: ######
 # (vertical asymp = 0; horizontal asymp = contact angle)
@@ -197,8 +208,9 @@ func_hyprblc <- function(droplet_widths){ a*(1/(sinh(droplet_widths^b))) + c}
 plt1 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
-  stat_function(fun = func_hyprblc) +
-  ylim(0,180)
+  stat_function(fun = func_hyprblc, colour = "magenta", size=1) +
+  ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
+  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
 
 plt1
 # plotly::ggplotly(plt)
@@ -224,8 +236,9 @@ func_linear <- function(droplet_widths){y_int}
 plt2 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
-  stat_function(fun = func_linear) +
-  ylim(0,180)
+  stat_function(fun = func_linear, colour = "magenta", size=1) +
+  ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
+  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
 
 plt2
 # plotly::ggplotly(plt)
@@ -287,7 +300,8 @@ plt3 <- ggplot() +
   geom_point(mapping=aes(x=droplet_widths, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_hyprblc_bins, colour="magenta", size=1) +
-  ylim(0,180)
+  ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
+  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
 
 plt3
 # plotly::ggplotly(plt)
