@@ -16,107 +16,115 @@ droplet_widths <- c()
 contact_angles <- c()
 radii <- c() 
 
-# Write RMS errors of circlefit() to file (instead of printing to console):
-sink(file = "circfit RMS errors.csv", append = FALSE)
+# Create Progress Bar for 'for' loop (below):
+progress = txtProgressBar(min = 1, max = no_of_drops, initial = 1)
 
 for (i in 1:no_of_drops) {
 
-xy_data_file <- paste(i, "_XZ_SurfacePx.csv", sep = "")
-
-xy <- read.csv(paste(directory, xy_data_file, sep = "\\"))
-
-# reduce data by averaging out y values on equivalent x positions:
-if (y_data_reduction==TRUE) {
+  # Write RMS errors of circlefit() to file (instead of printing to console):
+  sink(file = "circfit RMS errors.csv", append = FALSE)
   
-  xy_averaged <- data.frame(
-    X_um = unique(xy$X_micron),
-    Ymean_um = NA
-    )
+  xy_data_file <- paste(i, "_XZ_SurfacePx.csv", sep = "")
   
-  for (j in 1:nrow(xy_averaged)) {
-    equiv_x_pos <- xy$X_micron == xy_averaged$X_um[j]
-    xy_averaged$Ymean_um[j] <- mean(xy$Y_micron[equiv_x_pos])
+  xy <- read.csv(paste(directory, xy_data_file, sep = "\\"))
+  
+  # reduce data by averaging out y values on equivalent x positions:
+  if (y_data_reduction==TRUE) {
+    
+    xy_averaged <- data.frame(
+      X_um = unique(xy$X_micron),
+      Ymean_um = NA
+      )
+    
+    for (j in 1:nrow(xy_averaged)) {
+      equiv_x_pos <- xy$X_micron == xy_averaged$X_um[j]
+      xy_averaged$Ymean_um[j] <- mean(xy$Y_micron[equiv_x_pos])
+    }
+    
+    #Assign cols that contain appropriate x and y coords:
+    xdata <- xy_averaged$X_um
+    ydata <- xy_averaged$Ymean_um
+  
+  } else {
+    
+    #Assign cols that contain appropriate x and y coords:
+    xdata <- xy[,5]
+    ydata <- xy[,6]
   }
   
-  #Assign cols that contain appropriate x and y coords:
-  xdata <- xy_averaged$X_um
-  ydata <- xy_averaged$Ymean_um
   
-} else {
-
-#Assign cols that contain appropriate x and y coords:
-xdata <- xy[,5]
-ydata <- xy[,6]
+  #Fit circle function to data (xy):
+  cfit <- pracma::circlefit(xdata, ydata)
+  radius <- cfit[3]
+  # (append...)
+  radii <- c(radii, radius)
+  
+  #translate data so that circle centre is (0,0):
+  xy_trans <- data.frame(x = xdata-cfit[1], y = ydata-cfit[2])
+  cfit_trans <- c(0, 0, radius)  
+  ymin <- 0-cfit[2]
+  
+  # Function for a circle with centre (h,k) and radius r is: 
+  # (x-h)^2 + (y-k)^2 = r^2 ... (#pythagorus)
+  # If (h,k) = (0,0), 
+  #   then  x^2 + y^2 = r^2
+  #         x = sqrt(r^2 - y^2) (# 2 solns: same magnitude, opposite signs (-/+))
+  
+  # Coordinates for the points at either and of the drop-surface interface are
+  # given by:
+  xy_left <- c(-sqrt(cfit[3]^2 - ymin^2), ymin)
+  xy_right <- c(sqrt(cfit[3]^2 - ymin^2), ymin)
+  
+  # therefore chord length is...
+  droplet_width_temp <- xy_right[1]-xy_left[1]
+  # (append...)
+  droplet_widths <- c(droplet_widths, droplet_width_temp)
+  
+  #################################
+  # xy_left and xy_right are euclidian vectors of length r (as circle centre is (0,0))
+  
+  # The angle(s) between the chord and tangent(s) between/at these 2 points on
+  # the circle (i.e the Droplet Contact Angle) is equal to half the arc measure 
+  # (i.e. angle between the 2 euclidian vectors)...
+  
+  # (from https://stackoverflow.com/questions/1897704/angle-between-two-vectors-in-r)
+  #angle <- function(x,y){
+    #dot.prod <- x%*%y 
+    #norm.x <- norm(x,type="2")
+    #norm.y <- norm(y,type="2")
+    #theta <- acos(dot.prod / (norm.x * norm.y))
+    #as.numeric(theta)
+  #}
+  # gives angle in radians. Muliply by 180/pi to get degrees...
+  
+  #ContactAngle <- 0.5 * (180/pi) * angle(xy_left, xy_right)
+  ##################################
+  
+  # Alternatively, use isosceles triangle formed by radii and chord to calculate
+  # angle (lambda) between chord and radius (basic trigonometry)...
+  lambda <- acos((droplet_width_temp/2)/radius)
+  
+  # ... multiply by 180/pi to get degrees...
+  lambda <- lambda * 180/pi
+  
+  if (ymin < 0) {
+    lambda <- -1*lambda
+  }
+  
+  # ... the angle(s) between the chord and tangent(s) (i.e the Droplet Contact 
+  # Angle) is equal to 90 minus lambda...
+  contact_angle_temp <- 90 - lambda
+  # (append...)
+  contact_angles <- c(contact_angles, contact_angle_temp)
+  
+  # (end output to file)
+  sink()
+  
+  #Update progress bar:
+  setTxtProgressBar(progress, i)
+  
 }
 
-
-#Fit circle function to data (xy):
-cfit <- pracma::circlefit(xdata, ydata)
-radius <- cfit[3]
-# (append...)
-radii <- c(radii, radius)
-
-#translate data so that circle centre is (0,0):
-xy_trans <- data.frame(x = xdata-cfit[1], y = ydata-cfit[2])
-cfit_trans <- c(0, 0, radius)  
-ymin <- 0-cfit[2]
-
-# Function for a circle with centre (h,k) and radius r is: 
-# (x-h)^2 + (y-k)^2 = r^2 ... (#pythagorus)
-# If (h,k) = (0,0), 
-#   then  x^2 + y^2 = r^2
-#         x = sqrt(r^2 - y^2) (# 2 solns: same magnitude, opposite signs (-/+))
-
-# Coordinates for the points at either and of the drop-surface interface are
-# given by:
-xy_left <- c(-sqrt(cfit[3]^2 - ymin^2), ymin)
-xy_right <- c(sqrt(cfit[3]^2 - ymin^2), ymin)
-
-# therefore chord length is...
-droplet_width_temp <- xy_right[1]-xy_left[1]
-# (append...)
-droplet_widths <- c(droplet_widths, droplet_width_temp)
-
-#################################
-# xy_left and xy_right are euclidian vectors of length r (as circle centre is (0,0))
-
-# The angle(s) between the chord and tangent(s) between/at these 2 points on
-# the circle (i.e the Droplet Contact Angle) is equal to half the arc measure 
-# (i.e. angle between the 2 euclidian vectors)...
-
-# (from https://stackoverflow.com/questions/1897704/angle-between-two-vectors-in-r)
-#angle <- function(x,y){
-  #dot.prod <- x%*%y 
-  #norm.x <- norm(x,type="2")
-  #norm.y <- norm(y,type="2")
-  #theta <- acos(dot.prod / (norm.x * norm.y))
-  #as.numeric(theta)
-#}
-# gives angle in radians. Muliply by 180/pi to get degrees...
-
-#ContactAngle <- 0.5 * (180/pi) * angle(xy_left, xy_right)
-##################################
-
-# Alternatively, use isosceles triangle formed by radii and chord to calculate
-# angle (lambda) between chord and radius (basic trigonometry)...
-lambda <- acos((droplet_width_temp/2)/radius)
-
-# ... multiply by 180/pi to get degrees...
-lambda <- lambda * 180/pi
-
-if (ymin < 0) {
-  lambda <- -1*lambda
-}
-
-# ... the angle(s) between the chord and tangent(s) (i.e the Droplet Contact 
-# Angle) is equal to 90 minus lambda...
-contact_angle_temp <- 90 - lambda
-# (append...)
-contact_angles <- c(contact_angles, contact_angle_temp)
-
-}
-
-sink()
 
 
 ### visualisation ### (ONLY SHOWS FINAL DROPLET)
