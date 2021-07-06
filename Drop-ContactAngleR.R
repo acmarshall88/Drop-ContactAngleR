@@ -10,6 +10,9 @@ no_of_drops <- 1029
 # final fit to find contact angle (relative error... e.g. 0.1 = 10%):
   RMSE_threshold <- 0.3
 
+# Width of bins for assigning values to before fitting model (hyperbolic):
+# (should be ~ 2-10% of no_of_drops)
+  nbins <- 0.04*no_of_drops
 
 #######################
 # Create empty vectors for filled with 'for' loop:
@@ -250,18 +253,20 @@ contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 ###### For binning data before fitting hyperbolic function: ######
 
 # set up dividers for bins:
-breaks <- seq(0, 13, by = 0.5)
+breaks <- seq(floor(min_droplet_width), 
+              ceiling(max_droplet_width), 
+              length.out = nbins+1)
 
 # specify interval/bin labels:
-bin_num <- seq(0.5, 13, by = 0.5)
-tags <- as.character(bin_num)
+bin_num <- breaks[2:length(breaks)]
+labels <- as.character(bin_num)
 
 # assign values to bins:
 bin <- cut(results$droplet_widths, 
            breaks=breaks, 
            include.lowest=TRUE, 
            right=FALSE, 
-           labels=tags)
+           labels=labels)
 # inspect bins
 summary(bin)
 
@@ -308,3 +313,4 @@ plt3
 
 contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
 contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
+
