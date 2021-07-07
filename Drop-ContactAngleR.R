@@ -251,17 +251,20 @@ max_radii <-max(results$radii, na.rm = TRUE)
 # For fitting all 3 coefficients: # 
 
 model_hyprblc <- nls(
-              formula = contact_angles ~ a*(1/(sinh(radii^b))) + c, 
+              formula = contact_angles ~ a/(sinh(radii^b)) + c,
+              # formula = contact_angles ~ a^(b-radii) + c,
               data = results, 
-              start = list(a=80, b=0.6, c=35),
+              start = list(a=20, b=1, c=40),
               control = nls.control(maxiter = 200, minFactor = 1/4096))
 summary(model_hyprblc)
 
-a <- coef(model_hyprblc)[1]
-b <- coef(model_hyprblc)[2]
-c <- coef(model_hyprblc)[3]
+a_h <- coef(model_hyprblc)[1]
+b_h <- coef(model_hyprblc)[2]
+c_h <- coef(model_hyprblc)[3]
 
-func_hyprblc <- function(radii){ a*(1/(sinh(radii^b))) + c}
+func_hyprblc <- function(radii){ a_h/(sinh(radii^b_h)) + c_h}
+# func_hyprblc <- function(radii){ a/radii^b + c}
+# func_hyprblc <- function(radii){ a^(b-radii) + c}
 
 plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
@@ -342,19 +345,19 @@ binned_data <- data.frame(bin_num, bin_mean_contact_angle)
 
 # Fit hyperbolic function: 
 
-model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a*(1/(sinh(bin_num^b))) + c, 
+model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a/(sinh(bin_num^b)) + c, 
              data = binned_data, 
              start = list(a=80, b=0.6, c=35),
              control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
 summary(model_hyprblc_bins)
 
-a<-coef(model_hyprblc_bins)[1]
-b<-coef(model_hyprblc_bins)[2]
-c<-coef(model_hyprblc_bins)[3]
+a_hbin<-coef(model_hyprblc_bins)[1]
+b_hbin<-coef(model_hyprblc_bins)[2]
+c_hbin<-coef(model_hyprblc_bins)[3]
 
 # Visualisation #
 
-func_hyprblc_bins <- function(bin_num){ a*(1/(sinh(bin_num^b))) + c}
+func_hyprblc_bins <- function(bin_num){ a_hbin/(sinh(bin_num^b_hbin)) + c_hbin}
 
 plt3 <- ggplot() +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
