@@ -1,6 +1,30 @@
-###### USER INPUT: ######
-directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_Confocal\\plateII_B11_60x_0p10_2048.nd2_analysis(1-1000_th15_f2_1.2)"
-no_of_drops <- 1029
+# README:
+  # filenames for files containing droplet surface coordinates need to be in the
+  # following format:
+  # "[i]_[plane][file_suffix]", where... 
+      # 'i' is an interger (droplet number)
+      # 'plane' is the profile slice plane (i.e. XZ or XY)
+      # 'file_suffix' must end in '.csv'
+  # (e.g. 1_XZ_SurfacePx.csv)
+  
+
+######  USER INPUT:  ######
+  
+# (use "\\" for "\" when listing path to data)...
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_confocal\\plateII_B11_60x_0p10_2048.nd2_analysis"
+  no_of_drops <- 500
+
+# Coordinate data file suffix:
+  file_suffix <- "_SurfacePx.csv"
+
+# List droplet profile slice planes to include (i.e. XZ and/or YZ):
+  planes <- c("XZ", "YZ")
+  
+# Interpolate data (i.e. convert pixel coordinates to micron values before 
+# circle-fitting)??
+# (Note: If the voxel dimensions are equal (i.e. Vox is cubic), this will make
+# no difference to the contact angle calculation)
+  interpolate <- TRUE
 
 # Reduce data (for each individual droplet, average out y values on equivalent
 # x positions)?
@@ -12,10 +36,22 @@ no_of_drops <- 1029
 
 # Width of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- 0.04*no_of_drops
+  nbins <- no_of_drops*0.05
 
-#######################
-# Create empty vectors for filled with 'for' loop:
+######  (END USER INPUT)  ######
+
+  
+######  INITIAL SET UP ######
+
+# Read in voxel dimensions for data interpolation:
+if (interpolate==TRUE){
+  vox_dimensions <- read.csv(paste(directory,"\\voxel_dimensions.csv",sep = ""))
+  vox_width <- vox_dimensions$Vx_width
+  vox_height <- vox_dimensions$Vx_height
+  vox_depth <- vox_dimensions$Vx_depth
+}
+
+# Create empty vectors for filling with 'for' loop:
 droplet_widths <- c()
 contact_angles <- c()
 radii <- c() 
@@ -24,119 +60,136 @@ radii <- c()
 progress = txtProgressBar(min = 1, max = no_of_drops, initial = 1)
 
 # Remove previous file containing list of RMSEs (if exists):
-if (file.exists("circfit RMS errors.csv")==TRUE) {
-  unlink("circfit RMS errors.csv")
+if (file.exists("temp circfit RMS errors.csv")==TRUE) {
+  unlink("temp circfit RMS errors.csv")
 }
 
-for (i in 1:no_of_drops) {
+######  (END INITIAL SET UP) ######
 
-  # Write RMS errors of circlefit() to file (instead of printing to console):
-  sink(file = "circfit RMS errors.csv", append = TRUE)
+
+######  START DATA PROCESSING ######
+# Loop through csv files containing droplet coordinates, fitting circle to each:
+for (l in planes) {
+  cat("\nFitting circles & calculating contact angles for", l, "droplet profiles...\n")
   
-  xy_data_file <- paste(i, "_XZ_SurfacePx.csv", sep = "")
+  for (i in 1:no_of_drops) {
   
-  xy <- read.csv(paste(directory, xy_data_file, sep = "\\"))
-  
-  # reduce data by averaging out y values on equivalent x positions:
-  if (y_data_reduction==TRUE) {
+    # Write RMS errors of circlefit() to file (instead of printing to console):
+    sink(file = "temp circfit RMS errors.csv", append = TRUE)
     
-    xy_averaged <- data.frame(
-      X_um = unique(xy$X_micron),
-      Ymean_um = NA
-      )
+    xy_data_file <- paste(i, "_", l, file_suffix, sep = "")
     
-    for (j in 1:nrow(xy_averaged)) {
-      equiv_x_pos <- xy$X_micron == xy_averaged$X_um[j]
-      xy_averaged$Ymean_um[j] <- mean(xy$Y_micron[equiv_x_pos])
+    xy <- read.csv(paste(directory, xy_data_file, sep = "\\"))
+    
+    
+    # Interpolate data (convert pixel coords to micron coords)
+    if (interpolate==TRUE) {
+      X_micron <- xy$X * vox_width
+      Y_micron <- xy$Y * vox_depth
+      xy <- cbind(xy, X_micron, Y_micron)
     }
     
-    #Assign cols that contain appropriate x and y coords:
-    xdata <- xy_averaged$X_um
-    ydata <- xy_averaged$Ymean_um
-  
-  } else {
     
-    #Assign cols that contain appropriate x and y coords:
-    xdata <- xy[,5]
-    ydata <- xy[,6]
+    # reduce data by averaging out y values on equivalent x positions:
+    if (y_data_reduction==TRUE) {
+      
+      xy_averaged <- data.frame(
+        X_um = unique(xy$X_micron),
+        Ymean_um = NA
+        )
+      
+      for (j in 1:nrow(xy_averaged)) {
+        equiv_x_pos <- xy$X_micron == xy_averaged$X_um[j]
+        xy_averaged$Ymean_um[j] <- mean(xy$Y_micron[equiv_x_pos])
+      }
+      
+      #Assign cols that contain appropriate x and y coords:
+      xdata <- xy_averaged$X_um
+      ydata <- xy_averaged$Ymean_um
+    
+    } else {
+      
+      #Assign cols that contain appropriate x and y coords:
+      xdata <- xy$X_micron
+      ydata <- xy$Y_micron
+    }
+    
+    
+    #Fit circle function to data (xy):
+    cfit <- pracma::circlefit(xdata, ydata)
+    radius <- cfit[3]
+    # (append...)
+    radii <- c(radii, radius)
+    
+    #translate data so that circle centre is (0,0):
+    xy_trans <- data.frame(x = xdata-cfit[1], y = ydata-cfit[2])
+    cfit_trans <- c(0, 0, radius)  
+    ymin <- 0-cfit[2]
+    
+    # Function for a circle with centre (h,k) and radius r is: 
+    # (x-h)^2 + (y-k)^2 = r^2 ... (#pythagorus)
+    # If (h,k) = (0,0), 
+    #   then  x^2 + y^2 = r^2
+    #         x = sqrt(r^2 - y^2) (# 2 solns: same magnitude, opposite signs (-/+))
+    
+    # Coordinates for the points at either and of the drop-surface interface are
+    # given by:
+    xy_left <- c(-sqrt(cfit[3]^2 - ymin^2), ymin)
+    xy_right <- c(sqrt(cfit[3]^2 - ymin^2), ymin)
+    
+    # therefore chord length is...
+    droplet_width_temp <- xy_right[1]-xy_left[1]
+    # (append...)
+    droplet_widths <- c(droplet_widths, droplet_width_temp)
+    
+    #################################
+    # xy_left and xy_right are euclidian vectors of length r (as circle centre is (0,0))
+    
+    # The angle(s) between the chord and tangent(s) between/at these 2 points on
+    # the circle (i.e the Droplet Contact Angle) is equal to half the arc measure 
+    # (i.e. angle between the 2 euclidian vectors)...
+    
+    # (from https://stackoverflow.com/questions/1897704/angle-between-two-vectors-in-r)
+    #angle <- function(x,y){
+      #dot.prod <- x%*%y 
+      #norm.x <- norm(x,type="2")
+      #norm.y <- norm(y,type="2")
+      #theta <- acos(dot.prod / (norm.x * norm.y))
+      #as.numeric(theta)
+    #}
+    # gives angle in radians. Muliply by 180/pi to get degrees...
+    
+    #ContactAngle <- 0.5 * (180/pi) * angle(xy_left, xy_right)
+    ##################################
+    
+    # Alternatively, use isosceles triangle formed by radii and chord to calculate
+    # angle (lambda) between chord and radius (basic trigonometry)...
+    lambda <- acos((droplet_width_temp/2)/radius)
+    
+    # ... multiply by 180/pi to get degrees...
+    lambda <- lambda * 180/pi
+    
+    if (ymin < 0) {
+      lambda <- -1*lambda
+    }
+    
+    # ... the angle(s) between the chord and tangent(s) (i.e the Droplet Contact 
+    # Angle) is equal to 90 minus lambda...
+    contact_angle_temp <- 90 - lambda
+    # (append...)
+    contact_angles <- c(contact_angles, contact_angle_temp)
+    
+    # (end output to file)
+    sink()
+    
+    #Update progress bar:
+    setTxtProgressBar(progress, i)
+    
   }
-  
-  
-  #Fit circle function to data (xy):
-  cfit <- pracma::circlefit(xdata, ydata)
-  radius <- cfit[3]
-  # (append...)
-  radii <- c(radii, radius)
-  
-  #translate data so that circle centre is (0,0):
-  xy_trans <- data.frame(x = xdata-cfit[1], y = ydata-cfit[2])
-  cfit_trans <- c(0, 0, radius)  
-  ymin <- 0-cfit[2]
-  
-  # Function for a circle with centre (h,k) and radius r is: 
-  # (x-h)^2 + (y-k)^2 = r^2 ... (#pythagorus)
-  # If (h,k) = (0,0), 
-  #   then  x^2 + y^2 = r^2
-  #         x = sqrt(r^2 - y^2) (# 2 solns: same magnitude, opposite signs (-/+))
-  
-  # Coordinates for the points at either and of the drop-surface interface are
-  # given by:
-  xy_left <- c(-sqrt(cfit[3]^2 - ymin^2), ymin)
-  xy_right <- c(sqrt(cfit[3]^2 - ymin^2), ymin)
-  
-  # therefore chord length is...
-  droplet_width_temp <- xy_right[1]-xy_left[1]
-  # (append...)
-  droplet_widths <- c(droplet_widths, droplet_width_temp)
-  
-  #################################
-  # xy_left and xy_right are euclidian vectors of length r (as circle centre is (0,0))
-  
-  # The angle(s) between the chord and tangent(s) between/at these 2 points on
-  # the circle (i.e the Droplet Contact Angle) is equal to half the arc measure 
-  # (i.e. angle between the 2 euclidian vectors)...
-  
-  # (from https://stackoverflow.com/questions/1897704/angle-between-two-vectors-in-r)
-  #angle <- function(x,y){
-    #dot.prod <- x%*%y 
-    #norm.x <- norm(x,type="2")
-    #norm.y <- norm(y,type="2")
-    #theta <- acos(dot.prod / (norm.x * norm.y))
-    #as.numeric(theta)
-  #}
-  # gives angle in radians. Muliply by 180/pi to get degrees...
-  
-  #ContactAngle <- 0.5 * (180/pi) * angle(xy_left, xy_right)
-  ##################################
-  
-  # Alternatively, use isosceles triangle formed by radii and chord to calculate
-  # angle (lambda) between chord and radius (basic trigonometry)...
-  lambda <- acos((droplet_width_temp/2)/radius)
-  
-  # ... multiply by 180/pi to get degrees...
-  lambda <- lambda * 180/pi
-  
-  if (ymin < 0) {
-    lambda <- -1*lambda
-  }
-  
-  # ... the angle(s) between the chord and tangent(s) (i.e the Droplet Contact 
-  # Angle) is equal to 90 minus lambda...
-  contact_angle_temp <- 90 - lambda
-  # (append...)
-  contact_angles <- c(contact_angles, contact_angle_temp)
-  
-  # (end output to file)
-  sink()
-  
-  #Update progress bar:
-  setTxtProgressBar(progress, i)
-  
 }
 
 
-
-### visualisation ### (ONLY SHOWS FINAL DROPLET)
+### visualisation (ONLY SHOWS FINAL DROPLET) ####
 
 # circle fit:
 library(conicfit)
@@ -159,7 +212,7 @@ ggplot(NULL, aes(x, y)) +
 #####################
 
 # Remove "RMS error: " label from RMS error list:
-cfit_RMSEs <- read.csv("circfit RMS errors.csv", header = FALSE)
+cfit_RMSEs <- read.csv("temp circfit RMS errors.csv", header = FALSE)
 cfit_RMSEs <- tidyr::separate(data = cfit_RMSEs,
                          col = 1,
                          into = c(NA, NA, "cfit_RMSE"),
