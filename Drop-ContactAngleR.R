@@ -12,7 +12,7 @@
   
 # (use "\\" for "\" when listing path to data)...
   directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_confocal\\plateII_B11_60x_0p10_2048.nd2_analysis"
-  no_of_drops <- 500
+  no_of_drops <- 1029
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -34,9 +34,9 @@
 # final fit to find contact angle (relative error... e.g. 0.1 = 10%):
   RMSE_threshold <- 0.3
 
-# Width of bins for assigning values to before fitting model (hyperbolic):
+# Number of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- no_of_drops*0.05
+  nbins <- 100
 
 ######  (END USER INPUT)  ######
 
@@ -233,8 +233,10 @@ results <- results[rows_to_keep,]
 # Assign min and max values (for plots):
 min_contact_angle <-min(results$contact_angles, na.rm = TRUE)
 max_contact_angle <-max(results$contact_angles, na.rm = TRUE)
-min_droplet_width <-min(results$droplet_widths, na.rm = TRUE)
-max_droplet_width <-max(results$droplet_widths, na.rm = TRUE)
+# min_droplet_width <-min(results$droplet_widths, na.rm = TRUE)
+# max_droplet_width <-max(results$droplet_widths, na.rm = TRUE)
+min_radii <-min(results$radii, na.rm = TRUE)
+max_radii <-max(results$radii, na.rm = TRUE)
 
 ###### Fit hyperbolic function with 2 asymptotes: ######
 # (vertical asymp = 0; horizontal asymp = contact angle)
@@ -249,7 +251,7 @@ max_droplet_width <-max(results$droplet_widths, na.rm = TRUE)
 # For fitting all 3 coefficients: # 
 
 model_hyprblc <- nls(
-              formula = contact_angles ~ a*(1/(sinh(droplet_widths^b))) + c, 
+              formula = contact_angles ~ a*(1/(sinh(radii^b))) + c, 
               data = results, 
               start = list(a=80, b=0.6, c=35),
               control = nls.control(maxiter = 200, minFactor = 1/4096))
@@ -259,14 +261,14 @@ a <- coef(model_hyprblc)[1]
 b <- coef(model_hyprblc)[2]
 c <- coef(model_hyprblc)[3]
 
-func_hyprblc <- function(droplet_widths){ a*(1/(sinh(droplet_widths^b))) + c}
+func_hyprblc <- function(radii){ a*(1/(sinh(radii^b))) + c}
 
-plt1 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
+plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
   stat_function(fun = func_hyprblc, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
-  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
+  xlim(0.9*min_radii, 1.1*max_radii)
 
 plt1
 # plotly::ggplotly(plt)
@@ -287,14 +289,14 @@ summary(model_linear)
 
 y_int <- coef(model_linear)[1]
 
-func_linear <- function(droplet_widths){y_int}
+func_linear <- function(radii){y_int}
 
-plt2 <- ggplot(data = results, mapping = aes(x=droplet_widths, y=contact_angles)) +
+plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
   stat_function(fun = func_linear, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
-  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
+  xlim(0.9*min_radii, 1.1*max_radii)
 
 plt2
 # plotly::ggplotly(plt)
@@ -306,8 +308,8 @@ contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 ###### For binning data before fitting hyperbolic function: ######
 
 # set up dividers for bins:
-breaks <- seq(floor(min_droplet_width), 
-              ceiling(max_droplet_width), 
+breaks <- seq(floor(min_radii), 
+              ceiling(max_radii), 
               length.out = nbins+1)
 
 # specify interval/bin labels:
@@ -315,7 +317,7 @@ bin_num <- breaks[2:length(breaks)]
 labels <- as.character(bin_num)
 
 # assign values to bins:
-bin <- cut(results$droplet_widths, 
+bin <- cut(results$radii, 
            breaks=breaks, 
            include.lowest=TRUE, 
            right=FALSE, 
@@ -343,7 +345,7 @@ binned_data <- data.frame(bin_num, bin_mean_contact_angle)
 model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a*(1/(sinh(bin_num^b))) + c, 
              data = binned_data, 
              start = list(a=80, b=0.6, c=35),
-             control = nls.control(maxiter = 200, minFactor = 1/4096))
+             control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
 summary(model_hyprblc_bins)
 
 a<-coef(model_hyprblc_bins)[1]
@@ -355,11 +357,11 @@ c<-coef(model_hyprblc_bins)[3]
 func_hyprblc_bins <- function(bin_num){ a*(1/(sinh(bin_num^b))) + c}
 
 plt3 <- ggplot() +
-  geom_point(mapping=aes(x=droplet_widths, y=contact_angles, colour=RMSE_norm), data=results) +
+  geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_hyprblc_bins, colour="magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
-  xlim(0.9*min_droplet_width, 1.1*max_droplet_width)
+  xlim(0, 1.1*max_radii)
 
 plt3
 # plotly::ggplotly(plt)
