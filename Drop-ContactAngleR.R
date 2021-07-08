@@ -26,10 +26,15 @@
 # no difference to the contact angle calculation)
   interpolate <- TRUE
 
-# Reduce data (for each individual droplet, average out y values on equivalent
-# x positions)?
+# Reduce data in y-direction (for each individual droplet, average out y values
+# on equivalent x positions)?
   y_data_reduction <- TRUE
 
+# Minimum no. of points required to include drop in analysis (coordinate data 
+# containing less points than this will be skipped):
+# (Note: this is applied AFTER y-data reduction if TRUE)
+  pixel_threshold <- 3
+  
 # Circle fit error (normalised RMSE) threshold for inclusion of droplet in
 # final fit to find contact angle (relative error... e.g. 0.1 = 10%):
   RMSE_threshold <- 0.3
@@ -116,7 +121,7 @@ for (l in planes) {
     }
     
     # Skip to next iteration if data are inappropriate for circle-fitting:
-    if (length(xdata) < 3 | length(unique(ydata)) == 1) {
+    if (length(xdata) < pixel_threshold | length(unique(ydata)) == 1) {
       
       # (end output to file)
       sink()
@@ -205,7 +210,8 @@ for (l in planes) {
 }
 
 
-### visualisation (ONLY SHOWS FINAL DROPLET) ####
+
+### visualisation of circle-fitting (ONLY SHOWS FINAL DROPLET): ####
 
 # circle fit:
 library(conicfit)
@@ -225,7 +231,7 @@ ggplot(NULL, aes(x, y)) +
 
   
 
-#####################
+#### Prep data for model-fitting to find contact angle: ####
 
 # Remove "RMS error: " label from RMS error list:
 cfit_RMSEs <- read.csv("temp circfit RMS errors.csv", header = FALSE)
@@ -254,7 +260,38 @@ max_contact_angle <-max(results$contact_angles, na.rm = TRUE)
 min_radii <-min(results$radii, na.rm = TRUE)
 max_radii <-max(results$radii, na.rm = TRUE)
 
-###### Fit hyperbolic function with 2 asymptotes: ######
+
+
+#### Fit horizontal line: ####
+# (used when using a very strict data (pixel and RMSE) thresholds... 
+# i.e. only large, well-fitted droplets should be included in the data)
+
+model_linear <- nls(
+  formula = contact_angles ~ y_int,
+  data = results,
+  start = list(y_int=35))
+summary(model_linear)
+
+y_int <- coef(model_linear)[1]
+
+func_linear <- function(radii){y_int}
+
+plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+  geom_point(mapping = aes(colour=RMSE_norm)) +
+  # geom_smooth() +
+  stat_function(fun = func_linear, colour = "magenta", size=1) +
+  ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
+  xlim(0, 1.1*max_radii)
+
+plt2
+# plotly::ggplotly(plt)
+
+contact_angle_linear <- summary(model_linear)$parameters[1,1]
+contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
+
+
+
+#### Fit hyperbolic function (orthogonal asymptotes): ####
 # (vertical asymp = 0; horizontal asymp = contact angle)
 
 # Manual approximation...
@@ -296,35 +333,39 @@ contact_angle_hyprblc <- summary(model_hyprblc)$parameters[3,1]
 contact_angle_hyprblc_stderr <- summary(model_hyprblc)$parameters[3,2]
 
 
-###### For fitting horizontal line ######
-# (used when using a very strict RMSE_threshold... i.e. only large, well-fitted
-# droplets should be included in the data)
 
-model_linear <- nls(
-              formula = contact_angles ~ y_int,
-              data = results,
-              start = list(y_int=35))
-summary(model_linear)
+#### Fit power function: ####
 
-y_int <- coef(model_linear)[1]
+model_pwr <- nls(
+  formula = contact_angles ~ a/radii^b + c,
+  # formula = contact_angles ~ a^(b-radii) + c,
+  data = results, 
+  start = list(a=40, b=1, c=30),
+  control = nls.control(maxiter = 200, minFactor = 1/4096))
+summary(model_pwr)
 
-func_linear <- function(radii){y_int}
+a_p <- coef(model_pwr)[1]
+b_p <- coef(model_pwr)[2]
+c_p <- coef(model_pwr)[3]
 
-plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+func_pwr <- function(radii){ a_p/radii^b_p + c_p}
+
+plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
-  stat_function(fun = func_linear, colour = "magenta", size=1) +
+  stat_function(fun = func_pwr, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt2
+plt1
 # plotly::ggplotly(plt)
 
-contact_angle_linear <- summary(model_linear)$parameters[1,1]
-contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
+contact_angle_pwr <- summary(model_pwr)$parameters[3,1]
+contact_angle_pwr_stderr <- summary(model_pwr)$parameters[3,2]
 
 
-###### For binning data before fitting hyperbolic function: ######
+
+###### For binning data before fitting: ######
 
 # set up dividers for bins:
 breaks <- seq(floor(min_radii), 
@@ -359,7 +400,9 @@ for (k in bin_num) {
 
 binned_data <- data.frame(bin_num, bin_mean_contact_angle)
 
-# Fit hyperbolic function: 
+
+
+#### Fit hyperbolic function (BINNED DATA): ####
 
 model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a/(sinh(bin_num^b)) + c, 
              data = binned_data, 
@@ -371,7 +414,7 @@ a_hbin<-coef(model_hyprblc_bins)[1]
 b_hbin<-coef(model_hyprblc_bins)[2]
 c_hbin<-coef(model_hyprblc_bins)[3]
 
-# Visualisation #
+# Visualisation: #
 
 func_hyprblc_bins <- function(bin_num){ a_hbin/(sinh(bin_num^b_hbin)) + c_hbin}
 
@@ -387,4 +430,35 @@ plt3
 
 contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
 contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
+
+
+
+#### Fit power function (BINNED DATA): ####
+
+model_pwr_bins <- nls(formula = bin_mean_contact_angle ~ a/bin_num^b + c, 
+                          data = binned_data, 
+                          start = list(a=40, b=1, c=30),
+                          control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
+summary(model_pwr_bins)
+
+a_pbin<-coef(model_pwr_bins)[1]
+b_pbin<-coef(model_pwr_bins)[2]
+c_pbin<-coef(model_pwr_bins)[3]
+
+# Visualisation #
+
+func_pwr_bins <- function(bin_num){ a_hbin/bin_num^b_hbin + c_hbin}
+
+plt3 <- ggplot() +
+  geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
+  geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
+  stat_function(fun=func_pwr_bins, colour="magenta", size=1) +
+  ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
+  xlim(0, 1.1*max_radii)
+
+plt3
+# plotly::ggplotly(plt3)
+
+contact_angle_pwr_bins <- summary(model_pwr_bins)$parameters[3,1]
+contact_angle_pwr_bins_stderr <- summary(model_pwr_bins)$parameters[3,2]
 
