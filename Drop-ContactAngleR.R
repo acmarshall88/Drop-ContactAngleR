@@ -296,7 +296,7 @@ contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 
 # Manual approximation...
 # f <- function(x) 80*(1/(sinh(x^0.6))) + 35
-# (i.e. a=100, b=0.7, c=40)
+# (i.e. a=80, b=0.7, c=40)
 
 # 'c' is the horizontal asymptote, and represents the theoretical contact angle
 # of an infinitely large droplet.
@@ -304,7 +304,7 @@ contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 # For fitting all 3 coefficients: # 
 
 model_hyprblc <- nls(
-              formula = contact_angles ~ a/(sinh(radii^b)) + c,
+              formula = contact_angles ~ a/sinh(radii-vox_width/2)^b + c,
               # formula = contact_angles ~ a^(b-radii) + c,
               data = results, 
               start = list(a=20, b=1, c=40),
@@ -315,13 +315,10 @@ a_h <- coef(model_hyprblc)[1]
 b_h <- coef(model_hyprblc)[2]
 c_h <- coef(model_hyprblc)[3]
 
-func_hyprblc <- function(radii){ a_h/(sinh(radii^b_h)) + c_h}
-# func_hyprblc <- function(radii){ a/radii^b + c}
-# func_hyprblc <- function(radii){ a^(b-radii) + c}
+func_hyprblc <- function(radii){ a_h/sinh(radii-vox_width/2)^b_h + c_h}
 
 plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
-  # geom_smooth() +
   stat_function(fun = func_hyprblc, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
@@ -337,8 +334,7 @@ contact_angle_hyprblc_stderr <- summary(model_hyprblc)$parameters[3,2]
 #### Fit power function: ####
 
 model_pwr <- nls(
-  formula = contact_angles ~ a/radii^b + c,
-  # formula = contact_angles ~ a^(b-radii) + c,
+  formula = contact_angles ~ a/(radii-vox_width/2)^b + c,
   data = results, 
   start = list(a=40, b=1, c=30),
   control = nls.control(maxiter = 200, minFactor = 1/4096))
@@ -348,7 +344,7 @@ a_p <- coef(model_pwr)[1]
 b_p <- coef(model_pwr)[2]
 c_p <- coef(model_pwr)[3]
 
-func_pwr <- function(radii){ a_p/radii^b_p + c_p}
+func_pwr <- function(radii){ a_p/(radii-vox_width/2)^b_p + c_p}
 
 plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
@@ -404,10 +400,11 @@ binned_data <- data.frame(bin_num, bin_mean_contact_angle)
 
 #### Fit hyperbolic function (BINNED DATA): ####
 
-model_hyprblc_bins <- nls(formula = bin_mean_contact_angle ~ a/(sinh(bin_num^b)) + c, 
-             data = binned_data, 
-             start = list(a=80, b=0.6, c=35),
-             control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
+model_hyprblc_bins <- nls(
+            formula = bin_mean_contact_angle ~ a/sinh(bin_num-vox_width/2)^b + c, 
+            data = binned_data, 
+            start = list(a=25, b=0.15, c=30),
+            control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
 summary(model_hyprblc_bins)
 
 a_hbin<-coef(model_hyprblc_bins)[1]
@@ -416,7 +413,7 @@ c_hbin<-coef(model_hyprblc_bins)[3]
 
 # Visualisation: #
 
-func_hyprblc_bins <- function(bin_num){ a_hbin/(sinh(bin_num^b_hbin)) + c_hbin}
+func_hyprblc_bins <- function(bin_num){ a_hbin/sinh(bin_num-vox_width/2)^b_hbin + c_hbin}
 
 plt3 <- ggplot() +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
@@ -435,7 +432,7 @@ contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
 
 #### Fit power function (BINNED DATA): ####
 
-model_pwr_bins <- nls(formula = bin_mean_contact_angle ~ a/bin_num^b + c, 
+model_pwr_bins <- nls(formula = bin_mean_contact_angle ~ a/(bin_num-vox_width/2)^b + c, 
                           data = binned_data, 
                           start = list(a=40, b=1, c=30),
                           control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
@@ -447,7 +444,7 @@ c_pbin<-coef(model_pwr_bins)[3]
 
 # Visualisation #
 
-func_pwr_bins <- function(bin_num){ a_hbin/bin_num^b_hbin + c_hbin}
+func_pwr_bins <- function(bin_num){ a_hbin/(bin_num-vox_width/2)^b_hbin + c_hbin}
 
 plt3 <- ggplot() +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
