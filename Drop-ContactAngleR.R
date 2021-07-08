@@ -11,8 +11,8 @@
 ######  USER INPUT:  ######
   
 # (use "\\" for "\" when listing path to data)...
-  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_confocal\\plateII_B11_60x_0p10_2048.nd2_analysis"
-  no_of_drops <- 1029
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201127_Confocal\\ACM20201127\\plateII_H12_60x_0p175steps002.nd2_analysis_auto_alldrops_1.2"
+  no_of_drops <- 133
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -36,7 +36,7 @@
 
 # Number of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- 100
+  nbins <- 13
 
 ######  (END USER INPUT)  ######
 
@@ -55,6 +55,7 @@ if (interpolate==TRUE){
 droplet_widths <- c()
 contact_angles <- c()
 radii <- c() 
+skipped_droplets <- c()
 
 # Create Progress Bar for 'for' loop (below):
 progress = txtProgressBar(min = 1, max = no_of_drops, initial = 1)
@@ -114,6 +115,21 @@ for (l in planes) {
       ydata <- xy$Y_micron
     }
     
+    # Skip to next iteration if data are inappropriate for circle-fitting:
+    if (length(xdata) < 3 | length(unique(ydata)) == 1) {
+      
+      # (end output to file)
+      sink()
+      
+      # Update progress bar:
+      setTxtProgressBar(progress, i)
+      
+      # add droplet label to list
+      skipped_droplets <- c(skipped_droplets, paste(i, "_", l, sep = ""))
+      
+      # Go back to top (next iteration)
+      next
+    }
     
     #Fit circle function to data (xy):
     cfit <- pracma::circlefit(xdata, ydata)
@@ -271,7 +287,7 @@ plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   # geom_smooth() +
   stat_function(fun = func_hyprblc, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
-  xlim(0.9*min_radii, 1.1*max_radii)
+  xlim(0, 1.1*max_radii)
 
 plt1
 # plotly::ggplotly(plt)
@@ -299,7 +315,7 @@ plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
   # geom_smooth() +
   stat_function(fun = func_linear, colour = "magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
-  xlim(0.9*min_radii, 1.1*max_radii)
+  xlim(0, 1.1*max_radii)
 
 plt2
 # plotly::ggplotly(plt)
@@ -367,7 +383,7 @@ plt3 <- ggplot() +
   xlim(0, 1.1*max_radii)
 
 plt3
-# plotly::ggplotly(plt)
+# plotly::ggplotly(plt3)
 
 contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
 contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
