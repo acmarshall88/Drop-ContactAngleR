@@ -11,8 +11,8 @@
 ######  USER INPUT:  ######
   
 # (use "\\" for "\" when listing path to data)...
-  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201127_Confocal\\ACM20201127\\plateII_H10_60x_0p175steps002.nd2_analysis_2-1000"
-  no_of_drops <- 982
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_confocal\\plateII_B11_60x_0p10_2048.nd2_analysis(1-1000_th15_f2_1.2)"
+  no_of_drops <- 1029
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -41,7 +41,7 @@
 
 # Number of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- no_of_drops*0.04
+  nbins <- no_of_drops*0.02
 
 ######  (END USER INPUT)  ######
 
