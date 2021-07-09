@@ -11,8 +11,8 @@
 ######  USER INPUT:  ######
   
 # (use "\\" for "\" when listing path to data)...
-  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201127_Confocal\\ACM20201127\\plateII_H12_60x_0p175steps002.nd2_analysis_auto_alldrops_1.2"
-  no_of_drops <- 133
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201022_Confocal\\ACM20201022\\plateII_D15z_3x_0p7AU.nd2_analysis(alldrops_th15)"
+  no_of_drops <- 833
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -41,7 +41,7 @@
 
 # Number of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- 13
+  nbins <- no_of_drops*0.04
 
 ######  (END USER INPUT)  ######
 
@@ -87,6 +87,21 @@ for (l in planes) {
     
     xy <- read.csv(paste(directory, xy_data_file, sep = "\\"))
     
+    # Skip corrupted data:
+    if (ncol(xy) < 3) {
+      
+      # (end output to file)
+      sink()
+      
+      # Update progress bar:
+      setTxtProgressBar(progress, i)
+      
+      # add droplet label to list
+      skipped_droplets <- c(skipped_droplets, paste(i, "_", l, sep = ""))
+      
+      # Go back to top (next iteration)
+      next
+    }
     
     # Interpolate data (convert pixel coords to micron coords)
     if (interpolate==TRUE) {
