@@ -11,8 +11,8 @@
 ######  USER INPUT:  ######
   
 # (use "\\" for "\" when listing path to data)...
-  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201022_Confocal\\ACM20201022\\plateII_D15z_3x_0p7AU.nd2_analysis(alldrops_th15)"
-  no_of_drops <- 833
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20201127_Confocal\\ACM20201127\\plateII_H10_60x_0p175steps002.nd2_analysis_2-1000"
+  no_of_drops <- 982
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -48,6 +48,8 @@
   
 ######  INITIAL SET UP ######
 
+closeAllConnections()
+  
 # Read in voxel dimensions for data interpolation:
 if (interpolate==TRUE){
   vox_dimensions <- read.csv(paste(directory,"\\voxel_dimensions.csv",sep = ""))
