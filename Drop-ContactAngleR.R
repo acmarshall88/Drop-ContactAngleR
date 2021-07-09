@@ -272,22 +272,27 @@ model_linear <- nls(
   start = list(y_int=35))
 summary(model_linear)
 
+contact_angle_linear <- summary(model_linear)$parameters[1,1]
+contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
+
 y_int <- coef(model_linear)[1]
 
 func_linear <- function(radii){y_int}
 
-plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
-  geom_point(mapping = aes(colour=RMSE_norm)) +
+plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+  labs(title = "horizontal line fit", 
+       subtitle = paste("contact angle (y-intercept) =", 
+                        round(contact_angle_linear),
+                        "degrees",
+                        sep = " ")) +
+    geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
-  stat_function(fun = func_linear, colour = "magenta", size=1) +
+  stat_function(fun = func_linear, colour = "dark blue", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt2
+plt1
 # plotly::ggplotly(plt)
-
-contact_angle_linear <- summary(model_linear)$parameters[1,1]
-contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 
 
 
@@ -305,11 +310,15 @@ contact_angle_linear_stderr <- summary(model_linear)$parameters[1,2]
 
 model_hyprblc <- nls(
               formula = contact_angles ~ a/sinh(radii-vox_width/2)^b + c,
-              # formula = contact_angles ~ a^(b-radii) + c,
               data = results, 
               start = list(a=20, b=1, c=40),
               control = nls.control(maxiter = 200, minFactor = 1/4096))
 summary(model_hyprblc)
+
+contact_angle_hyprblc <- summary(model_hyprblc)$parameters[3,1]
+contact_angle_hyprblc_stderr <- summary(model_hyprblc)$parameters[3,2]
+
+# Visualisation: #
 
 a_h <- coef(model_hyprblc)[1]
 b_h <- coef(model_hyprblc)[2]
@@ -317,17 +326,19 @@ c_h <- coef(model_hyprblc)[3]
 
 func_hyprblc <- function(radii){ a_h/sinh(radii-vox_width/2)^b_h + c_h}
 
-plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+  labs(title = "hyperbolic fit", 
+       subtitle = paste("contact angle (asymptote) =", 
+                        round(contact_angle_hyprblc),
+                        "degrees",
+                        sep = " ")) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
-  stat_function(fun = func_hyprblc, colour = "magenta", size=1) +
+  stat_function(fun = func_hyprblc, colour = "dark blue", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt1
+plt2
 # plotly::ggplotly(plt)
-
-contact_angle_hyprblc <- summary(model_hyprblc)$parameters[3,1]
-contact_angle_hyprblc_stderr <- summary(model_hyprblc)$parameters[3,2]
 
 
 
@@ -340,24 +351,30 @@ model_pwr <- nls(
   control = nls.control(maxiter = 200, minFactor = 1/4096))
 summary(model_pwr)
 
+contact_angle_pwr <- summary(model_pwr)$parameters[3,1]
+contact_angle_pwr_stderr <- summary(model_pwr)$parameters[3,2]
+
+# Visualisation: #
+
 a_p <- coef(model_pwr)[1]
 b_p <- coef(model_pwr)[2]
 c_p <- coef(model_pwr)[3]
 
 func_pwr <- function(radii){ a_p/(radii-vox_width/2)^b_p + c_p}
 
-plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+plt3 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
+  labs(title = "power fit", 
+       subtitle = paste("contact angle (asymptote) =", 
+                        round(contact_angle_pwr),
+                        "degrees",
+                        sep = " ")) +
   geom_point(mapping = aes(colour=RMSE_norm)) +
-  # geom_smooth() +
-  stat_function(fun = func_pwr, colour = "magenta", size=1) +
+  stat_function(fun = func_pwr, colour = "dark blue", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt1
+plt3
 # plotly::ggplotly(plt)
-
-contact_angle_pwr <- summary(model_pwr)$parameters[3,1]
-contact_angle_pwr_stderr <- summary(model_pwr)$parameters[3,2]
 
 
 
@@ -407,26 +424,31 @@ model_hyprblc_bins <- nls(
             control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
 summary(model_hyprblc_bins)
 
+contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
+contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
+
+# Visualisation: #
+
 a_hbin<-coef(model_hyprblc_bins)[1]
 b_hbin<-coef(model_hyprblc_bins)[2]
 c_hbin<-coef(model_hyprblc_bins)[3]
 
-# Visualisation: #
-
 func_hyprblc_bins <- function(bin_num){ a_hbin/sinh(bin_num-vox_width/2)^b_hbin + c_hbin}
 
-plt3 <- ggplot() +
+plt4 <- ggplot() +
+  labs(title = "hyperbolic fit to binned data", 
+       subtitle = paste("contact angle (asymptote) =", 
+                        round(contact_angle_hyprblc_bins),
+                        "degrees",
+                        sep = " ")) +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_hyprblc_bins, colour="magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt3
+plt4
 # plotly::ggplotly(plt3)
-
-contact_angle_hyprblc_bins <- summary(model_hyprblc_bins)$parameters[3,1]
-contact_angle_hyprblc_bins_stderr <- summary(model_hyprblc_bins)$parameters[3,2]
 
 
 
@@ -438,24 +460,30 @@ model_pwr_bins <- nls(formula = bin_mean_contact_angle ~ a/(bin_num-vox_width/2)
                           control = nls.control(maxiter = 2000, minFactor = 1/(2^20)))
 summary(model_pwr_bins)
 
+contact_angle_pwr_bins <- summary(model_pwr_bins)$parameters[3,1]
+contact_angle_pwr_bins_stderr <- summary(model_pwr_bins)$parameters[3,2]
+
+# Visualisation #
+
 a_pbin<-coef(model_pwr_bins)[1]
 b_pbin<-coef(model_pwr_bins)[2]
 c_pbin<-coef(model_pwr_bins)[3]
 
-# Visualisation #
-
 func_pwr_bins <- function(bin_num){ a_hbin/(bin_num-vox_width/2)^b_hbin + c_hbin}
 
-plt3 <- ggplot() +
+plt5 <- ggplot() +
+  labs(title = "power fit to binned data", 
+       subtitle = paste("contact angle (asymptote) =", 
+                        round(contact_angle_pwr_bins),
+                        "degrees",
+                        sep = " ")) +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_pwr_bins, colour="magenta", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
   xlim(0, 1.1*max_radii)
 
-plt3
+plt5
 # plotly::ggplotly(plt3)
 
-contact_angle_pwr_bins <- summary(model_pwr_bins)$parameters[3,1]
-contact_angle_pwr_bins_stderr <- summary(model_pwr_bins)$parameters[3,2]
 
