@@ -284,7 +284,9 @@ plt1 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
        subtitle = paste("contact angle (y-intercept) =", 
                         round(contact_angle_linear),
                         "degrees",
-                        sep = " ")) +
+                        sep = " "),
+       x = "droplet radius (microns)",
+       y = "contact angle (degrees)") +
     geom_point(mapping = aes(colour=RMSE_norm)) +
   # geom_smooth() +
   stat_function(fun = func_linear, colour = "dark blue", size=1) +
@@ -331,7 +333,9 @@ plt2 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
        subtitle = paste("contact angle (asymptote) =", 
                         round(contact_angle_hyprblc),
                         "degrees",
-                        sep = " ")) +
+                        sep = " "),
+       x = "droplet radius (microns)",
+       y = "contact angle (degrees)") +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   stat_function(fun = func_hyprblc, colour = "dark blue", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
@@ -367,7 +371,9 @@ plt3 <- ggplot(data = results, mapping = aes(x=radii, y=contact_angles)) +
        subtitle = paste("contact angle (asymptote) =", 
                         round(contact_angle_pwr),
                         "degrees",
-                        sep = " ")) +
+                        sep = " "),
+       x = "droplet radius (microns)",
+       y = "contact angle (degrees)") +
   geom_point(mapping = aes(colour=RMSE_norm)) +
   stat_function(fun = func_pwr, colour = "dark blue", size=1) +
   ylim(0.9*min_contact_angle, 1.1*max_contact_angle) +
@@ -440,7 +446,9 @@ plt4 <- ggplot() +
        subtitle = paste("contact angle (asymptote) =", 
                         round(contact_angle_hyprblc_bins),
                         "degrees",
-                        sep = " ")) +
+                        sep = " "),
+       x = "droplet radius (microns)",
+       y = "contact angle (degrees)") +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_hyprblc_bins, colour="magenta", size=1) +
@@ -476,7 +484,9 @@ plt5 <- ggplot() +
        subtitle = paste("contact angle (asymptote) =", 
                         round(contact_angle_pwr_bins),
                         "degrees",
-                        sep = " ")) +
+                        sep = " "),
+       x = "droplet radius (microns)",
+       y = "contact angle (degrees)") +
   geom_point(mapping=aes(x=radii, y=contact_angles, colour=RMSE_norm), data=results) +
   geom_point(mapping=aes(x=bin_num, y=bin_mean_contact_angle), data=binned_data, colour="magenta", size=5) +
   stat_function(fun=func_pwr_bins, colour="magenta", size=1) +
