@@ -11,8 +11,8 @@
 ######  USER INPUT:  ######
   
 # (use "\\" for "\" when listing path to data)...
-  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210617_confocal\\plateII_B11_60x_0p10_2048.nd2_analysis(1-1000_th15_f2_1.2)"
-  no_of_drops <- 1029
+  directory <- "\\\\uniwa.uwa.edu.au\\userhome\\staff7\\00101127\\My Documents\\LLPS results\\20210720_SFPQ_WT_QG_confocal\\QG\\plateIII_E16_60x_XYZ_1024.nd2_analysis"
+  no_of_drops <- 887
 
 # Coordinate data file suffix:
   file_suffix <- "_SurfacePx.csv"
@@ -33,7 +33,7 @@
 # Minimum no. of points required to include drop in analysis (coordinate data 
 # containing less points than this will be skipped):
 # (Note: this is applied AFTER y-data reduction if TRUE)
-  pixel_threshold <- 3
+  pixel_threshold <- 4
   
 # Circle fit error (normalised RMSE) threshold for inclusion of droplet in
 # final fit to find contact angle (relative error... e.g. 0.1 = 10%):
@@ -41,7 +41,7 @@
 
 # Number of bins for assigning values to before fitting model (hyperbolic):
 # (should be ~ 2-10% of no_of_drops)
-  nbins <- no_of_drops*0.02
+  nbins <- no_of_drops*0.01
 
 ######  (END USER INPUT)  ######
 
@@ -60,9 +60,11 @@ if (interpolate==TRUE){
 
 # Create empty vectors for filling with 'for' loop:
 droplet_widths <- c()
+droplet_heights <- c()
 contact_angles <- c()
 radii <- c() 
 skipped_droplets <- c()
+droplet_labels <- c()
 
 # Create Progress Bar for 'for' loop (below):
 progress = txtProgressBar(min = 1, max = no_of_drops, initial = 1)
@@ -180,6 +182,11 @@ for (l in planes) {
     # (append...)
     droplet_widths <- c(droplet_widths, droplet_width_temp)
     
+    # Can also calculate droplet height...
+    droplet_height_temp <- max(xy_trans$y)-ymin
+    # (append...)
+    droplet_heights <- c(droplet_heights, droplet_height_temp)
+      
     #################################
     # xy_left and xy_right are euclidian vectors of length r (as circle centre is (0,0))
     
@@ -216,6 +223,9 @@ for (l in planes) {
     contact_angle_temp <- 90 - lambda
     # (append...)
     contact_angles <- c(contact_angles, contact_angle_temp)
+    
+    # Update record of droplet labels:
+    droplet_labels <- c(droplet_labels, paste(i, "_", l, sep = ""))
     
     # (end output to file)
     sink()
@@ -263,7 +273,7 @@ cfit_RMSEs <- sapply(cfit_RMSEs, as.numeric)
 RMSE_norm <- c(cfit_RMSEs/radii)
 
 # Assign results to single data frame:
-results <- data.frame(radii, cfit_RMSEs, RMSE_norm, droplet_widths, contact_angles)
+results <- data.frame(droplet_labels, radii, cfit_RMSEs, RMSE_norm, droplet_widths, droplet_heights, contact_angles)
 
 # Remove rows with RMSE_norm greater than threshold value:
 rows_to_keep <- RMSE_norm <= RMSE_threshold
@@ -519,3 +529,17 @@ plt5
 # plotly::ggplotly(plt3)
 
 
+
+
+#### Plot droplet height over droplet width: ####
+plt6 <- ggplot() +
+  labs(title = "Do droplets flatten off?", 
+       
+       x = "droplet width (microns)",
+       y = "droplet height (microns))",
+       colour = "RMS error\nof circle fit\n(relative)") +
+  geom_point(mapping=aes(x=droplet_widths, y=droplet_heights, colour=RMSE_norm, text=droplet_labels), data=results)
+  
+  
+plt6
+plotly::ggplotly(plt6, tooltip = "text")
